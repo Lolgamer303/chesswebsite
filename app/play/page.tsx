@@ -5,7 +5,7 @@ import type { ChessCaseType, ChessboardType } from "../components/Chesstypes";
 
 function defaultChessboard(): ChessboardType {
     // Initialize 8x8 board with alternating colors
-    const board: ChessboardType = [];
+    const cases: ChessCaseType[][] = [];
     
     for (let row = 0; row < 8; row++) {
         const boardRow: ChessCaseType[] = [];
@@ -41,14 +41,14 @@ function defaultChessboard(): ChessboardType {
             boardRow.push({
                 piece,
                 color: isWhiteSquare ? "white" : "black",
-                highlighted: false,
-                selected: false
+                isHighlighted: false,
+                isPossibleMove: false,
             });
         }
-        board.push(boardRow);
+        cases.push(boardRow);
     }
     
-    return board;
+    return { cases };
 }
 
 export default function Home() {
