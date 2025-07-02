@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChessCase } from "./ChessCase";
 import type { ChessboardType, ChessCaseType } from "./Chesstypes";
-import { setBishopPossibleMoves, setKingPossibleMoves, setKnightPossibleMoves, setPawnPossibleMoves, setQueenPossibleMoves, setRookPossibleMoves } from "./ChessPossiblesMoves";
+import { isCheckmate, setBishopPossibleMoves, setKingPossibleMoves, setKnightPossibleMoves, setPawnPossibleMoves, setQueenPossibleMoves, setRookPossibleMoves, updateCheckStatus } from "./ChessPossiblesMoves";
 
 interface ChessboardProps {
     chessboard?: ChessboardType;
@@ -13,8 +13,25 @@ function setPossibleMoves(chessboard: ChessboardType, selectedCase: { row: numbe
     chessboard = resetPossibleMoves(chessboard, setChessboard); // Reset previous possible moves
     if (!selectedChessCase.piece) return;
     
+    // Check if it's the correct player's turn
+    const pieceColor = selectedChessCase.piece.endsWith("l") ? "white" : "black";
+    if (pieceColor !== chessboard.currentTurn) return;
+    
     // Create a deep copy of the chessboard to avoid mutating the original
-    const newBoard = chessboard
+    const newBoard: ChessboardType = {
+        ...chessboard,
+        cases: chessboard.cases.map(row =>
+            row.map(cell => ({ ...cell }))
+        ),
+        moveHistory: {
+            hasKingMoved: { ...chessboard.moveHistory.hasKingMoved },
+            hasRookMoved: {
+                white: { ...chessboard.moveHistory.hasRookMoved.white },
+                black: { ...chessboard.moveHistory.hasRookMoved.black }
+            }
+        },
+        kingPositions: { ...chessboard.kingPositions }
+    };
     if (selectedChessCase.piece.startsWith("p")) {
         setPawnPossibleMoves(newBoard, selectedCase);
     }
@@ -39,13 +56,18 @@ function setPossibleMoves(chessboard: ChessboardType, selectedCase: { row: numbe
     }
 }
 
+function checkmate() {
+    alert("Checkmate! Game over.");
+}
+
 function resetPossibleMoves(chessboard: ChessboardType, setChessboard?: (chessboard: ChessboardType) => void) {
     const newBoard = {
         ...chessboard,
         cases: chessboard.cases.map(row => row.map(cell => ({
             ...cell,
             isPossibleMove: false
-        })))
+        }))),
+        moveHistory: { ...chessboard.moveHistory }
     };
 
     // Update the chessboard with the modified board
@@ -64,12 +86,18 @@ export default function Chessboard({ chessboard, setChessboard }: ChessboardProp
     const [selectedCase, setSelectedCase] = useState<{ row: number; col: number } | null>(null);
 
     const handleDragStart = (row: number, col: number, piece?: string) => {
-        if (piece) {
-            setDraggedPiece({ piece, fromRow: row, fromCol: col });
-        }
-        else {
-            setDraggedPiece({ piece: chessboard?.cases[row][col].piece ?? "", fromRow: row, fromCol: col });
-        }
+        const currentPiece = piece || chessboard?.cases[row][col].piece;
+        if (!currentPiece || !chessboard) return;
+        
+        // Check if it's the correct player's turn
+        const pieceColor = currentPiece.endsWith("l") ? "white" : "black";
+        if (pieceColor !== chessboard.currentTurn) return;
+        
+        setDraggedPiece({ 
+            piece: currentPiece, 
+            fromRow: row, 
+            fromCol: col 
+        });
     };
 
     function selectCase(pos: { row: number; col: number } | null) {
@@ -100,19 +128,102 @@ export default function Chessboard({ chessboard, setChessboard }: ChessboardProp
             return; // No piece to move
         }
         
+        // Check if it's the correct player's turn
+        const pieceColor = piece.endsWith("l") ? "white" : "black";
+        if (pieceColor !== chessboard.currentTurn) {
+            setDraggedPiece(null);
+            return;
+        }
+        
         const newBoard = { 
             ...chessboard,
-            cases: chessboard.cases.map(row => [...row])
+            cases: chessboard.cases.map(row => [...row]),
+            moveHistory: {
+                hasKingMoved: { ...chessboard.moveHistory.hasKingMoved },
+                hasRookMoved: {
+                    white: { ...chessboard.moveHistory.hasRookMoved.white },
+                    black: { ...chessboard.moveHistory.hasRookMoved.black }
+                }
+            }
         };
         
         if (newBoard.cases[toRow][toCol].isPossibleMove) {
-            // Remove piece from original position
-            newBoard.cases[fromRow][fromCol].piece = null;
+            // Check if this is a castling move
+            const isCastling = piece.startsWith("k") && Math.abs(toCol - fromCol) === 2;
             
-            // Place piece at new position
-            newBoard.cases[toRow][toCol].piece = piece as ChessCaseType["piece"];
+            if (isCastling) {
+                // Handle castling
+                const isKingside = toCol > fromCol;
+                const rookFromCol = isKingside ? 7 : 0;
+                const rookToCol = isKingside ? 5 : 3;
+                const backRank = fromRow;
+                
+                // Move king
+                newBoard.cases[fromRow][fromCol].piece = null;
+                newBoard.cases[toRow][toCol].piece = piece as ChessCaseType["piece"];
+                
+                // Move rook
+                const rookPiece = newBoard.cases[backRank][rookFromCol].piece;
+                newBoard.cases[backRank][rookFromCol].piece = null;
+                newBoard.cases[backRank][rookToCol].piece = rookPiece;
+                
+                // Update castling rights
+                newBoard.moveHistory.hasKingMoved[pieceColor] = true;
+                if (isKingside) {
+                    newBoard.moveHistory.hasRookMoved[pieceColor].kingside = true;
+                } else {
+                    newBoard.moveHistory.hasRookMoved[pieceColor].queenside = true;
+                }
+            } else {
+                // Regular move
+                newBoard.cases[fromRow][fromCol].piece = null;
+                newBoard.cases[toRow][toCol].piece = piece as ChessCaseType["piece"];
+                // Track piece movements for castling rights
+                if (piece.startsWith("k")) {
+                    newBoard.moveHistory.hasKingMoved[pieceColor] = true;
+                } else if (piece.startsWith("r")) {
+                    // Check which rook moved
+                    const isKingsideRook = (pieceColor === "white" && fromRow === 7 && fromCol === 7) ||
+                                         (pieceColor === "black" && fromRow === 0 && fromCol === 7);
+                    const isQueensideRook = (pieceColor === "white" && fromRow === 7 && fromCol === 0) ||
+                                          (pieceColor === "black" && fromRow === 0 && fromCol === 0);
+                    
+                    if (isKingsideRook) {
+                        newBoard.moveHistory.hasRookMoved[pieceColor].kingside = true;
+                    } else if (isQueensideRook) {
+                        newBoard.moveHistory.hasRookMoved[pieceColor].queenside = true;
+                    }
+                }
+            }
             
-            resetPossibleMoves(newBoard, setChessboard);
+            // Update king positions after the move
+            if (piece.startsWith("k")) {
+                const kingColor = piece.endsWith("l") ? "white" : "black";
+                newBoard.kingPositions[kingColor] = { row: toRow, col: toCol };
+            }
+            
+            // Switch turns
+            newBoard.currentTurn = newBoard.currentTurn === "white" ? "black" : "white";
+
+            // Update check status for the new current player (who just became the active player)
+            updateCheckStatus(newBoard);
+            
+            // Check for checkmate
+            if (newBoard.isInCheck && isCheckmate(newBoard)) {
+                console.log("Checkmate detected!");
+                checkmate();
+            }
+            
+            // Reset possible moves and update the board
+            const finalBoard = {
+                ...newBoard,
+                cases: newBoard.cases.map(row => row.map(cell => ({
+                    ...cell,
+                    isPossibleMove: false
+                })))
+            };
+            
+            setChessboard(finalBoard);
             setSelectedCase(null);
         } else {
             setChessboard(newBoard);
@@ -124,27 +235,65 @@ export default function Chessboard({ chessboard, setChessboard }: ChessboardProp
         setDraggedPiece(null);
     };
     
+    const handleToggleHighlight = (row: number, col: number) => {
+        if (!chessboard || !setChessboard) return;
+        
+        const newBoard = {
+            ...chessboard,
+            cases: chessboard.cases.map((boardRow, rowIndex) =>
+                boardRow.map((cell, colIndex) =>
+                    rowIndex === row && colIndex === col
+                        ? { ...cell, isHighlighted: !cell.isHighlighted }
+                        : cell
+                )
+            )
+        };
+        
+        setChessboard(newBoard);
+    };
+    const resetHighlight = () => {
+        if (!chessboard || !setChessboard) return;
+        const newBoard = {
+            ...chessboard,
+            cases: chessboard.cases.map(row => row.map(cell => ({
+                ...cell,
+                isHighlighted: false
+            })))
+        };
+
+        setChessboard(newBoard);
+    };
+
     if (!chessboard) {
         return <div>Loading chessboard...</div>;
     }
 
     return (
-        <div className="grid grid-cols-8 w-240 h-240 border-2 border-gray-800">
-            {chessboard.cases.map((row, rowIndex) =>
-                row.map((chessCase, colIndex) => (
-                    <ChessCase 
-                        key={`${rowIndex}-${colIndex}`} 
-                        chessCase={chessCase}
-                        rowIndex={rowIndex}
-                        colIndex={colIndex}
-                        onDragStart={(row, col, piece) => handleDragStart(row, col, piece)}
-                        onDrop={handleDrop}
-                        onDragEnd={handleDragEnd}
-                        selectedCase={selectedCase}
-                        selectCase={selectCase}
-                    />
-                ))
-            )}
+        <div className="flex flex-col items-center gap-4">
+            <div className="text-xl font-bold">
+                Current Turn: <span className={chessboard.currentTurn === "white" ? "text-gray-700" : "text-gray-900"}>
+                    {chessboard.currentTurn === "white" ? "White" : "Black"}
+                </span>
+            </div>
+            <div className="grid grid-cols-8 w-240 h-240 border-2 border-gray-800">
+                {chessboard.cases.map((row, rowIndex) =>
+                    row.map((chessCase, colIndex) => (
+                        <ChessCase 
+                            key={`${rowIndex}-${colIndex}`} 
+                            chessCase={chessCase}
+                            rowIndex={rowIndex}
+                            colIndex={colIndex}
+                            onDragStart={(row, col, piece) => handleDragStart(row, col, piece)}
+                            onDrop={handleDrop}
+                            onDragEnd={handleDragEnd}
+                            selectedCase={selectedCase}
+                            selectCase={selectCase}
+                            onToggleHighlight={handleToggleHighlight}
+                            resetHighlight={resetHighlight}
+                        />
+                    ))
+                )}
+            </div>
         </div>
     );
 }

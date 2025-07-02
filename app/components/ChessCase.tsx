@@ -10,6 +10,8 @@ interface ChessCaseProps {
     onDrop?: (toRow: number, toCol: number) => void;
     onDragEnd?: () => void;
     selectCase: (pos: { row: number; col: number } | null) => void;
+    onToggleHighlight?: (row: number, col: number) => void; // Add this
+    resetHighlight?: () => void; // Add this if you need to reset highlights
 }
 
 export function ChessCase({
@@ -21,6 +23,8 @@ export function ChessCase({
     onDragEnd,
     selectedCase,
     selectCase,
+    onToggleHighlight, // Add this
+    resetHighlight, // Add this if you need to reset highlights
 }: ChessCaseProps) {
     const isSelected =
         selectedCase?.row === rowIndex && selectedCase?.col === colIndex;
@@ -51,7 +55,7 @@ export function ChessCase({
         e?.preventDefault();
         if (onDrop && rowIndex !== undefined && colIndex !== undefined) {
             onDrop(rowIndex, colIndex);
-            selectCase(null);
+            // Don't call selectCase(null) here - let the parent handle it
         }
     };
 
@@ -68,13 +72,21 @@ export function ChessCase({
                         ? "bg-[#F5F682]"
                         : "bg-[#B9CA43]"
                     : chessCase.isHighlighted
-                        ? "bg-yellow-300"
-                    : chessCase.color === "white"
-                        ? "bg-[#EBECD0]"
-                        : "bg-[#739552]"
+                        ? chessCase.color === "white"
+                            ? "bg-red-200" // Different color to distinguish from selection
+                            : "bg-red-400"
+                        : chessCase.color === "white"
+                            ? "bg-[#EBECD0]"
+                            : "bg-[#739552]"
             }`}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                if (rowIndex !== undefined && colIndex !== undefined && onToggleHighlight) {
+                    onToggleHighlight(rowIndex, colIndex); // Use callback instead
+                }
+            }}
             onClick={() => {
                 if (chessCase.isPossibleMove && selectedCase) {
                     // Move the selected piece to this position
@@ -84,6 +96,7 @@ export function ChessCase({
                         colIndex !== undefined
                     ) {
                         onDrop(rowIndex, colIndex);
+                        // Don't call selectCase(null) here - let the parent handle it
                     }
                 } else {
                     if (isSelected) {
@@ -92,6 +105,7 @@ export function ChessCase({
                         selectCase({ row: rowIndex ?? 0, col: colIndex ?? 0 });
                     }
                 }
+                resetHighlight?.(); // Reset highlights if needed
             }}
         >
             <div className='relative w-full h-full'>
@@ -109,6 +123,10 @@ export function ChessCase({
                         />
                     </div>
                 )}
+                {chessCase.isHighlighted && (
+                    <div className={`absolute inset-0 flex items-center justify-center pointer-events-none ${chessCase.color === "white" ? "bg-[#EB7D6A]" : "bg-[#D36C50]"}`}>
+                    </div>
+                )}
                 {chessCase.isPossibleMove && !chessCase.piece && (
                     <div className='absolute inset-0 flex items-center justify-center pointer-events-none'>
                         <div className={`w-10 h-10 ${chessCase.color === "white" ? "bg-[#CACBB3]" : "bg-[#638046]"} rounded-full`}></div>
@@ -119,6 +137,7 @@ export function ChessCase({
                         <div className={`w-27 h-27 bg-transparent border-12 opacity-85 ${chessCase.color === "white" ? "border-[#CACBB3]" : "border-[#638046]"} rounded-full`}></div>
                     </div>
                 )}
+
             </div>
         </button>
     );

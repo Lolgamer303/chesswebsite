@@ -48,7 +48,22 @@ function defaultChessboard(): ChessboardType {
         cases.push(boardRow);
     }
     
-    return { cases };
+    return { 
+        cases,
+        currentTurn: "white", // White always starts first in chess
+        isInCheck: null, // No check at the start
+        moveHistory: {
+            hasKingMoved: { white: false, black: false },
+            hasRookMoved: {
+                white: { queenside: false, kingside: false },
+                black: { queenside: false, kingside: false }
+            }
+        },
+        kingPositions: {
+            white: { row: 7, col: 4 }, // White king starts on
+            black: { row: 0, col: 4 } // Black king starts on e8
+        }
+    };
 }
 
 export default function Home() {
