@@ -112,6 +112,14 @@ export function ChessCase({
                         onDrop(rowIndex, colIndex);
                         switchTurn?.(); // Call switchTurn after move
                         resetpossibleMoves?.(); // Reset possible moves after move
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
                     }
                 } else {
                     if (isSelected) {

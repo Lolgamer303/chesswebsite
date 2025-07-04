@@ -336,6 +336,12 @@ export default function Chessboard({ chessboard, setChessboard }: ChessboardProp
                                 }
                             }}
                             resetHighlight={resetHighlight}
+                        
+                        
+                        
+                        
+                        
+                        
                         />
                     ))
                 )}

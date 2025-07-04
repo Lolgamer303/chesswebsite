@@ -187,11 +187,16 @@ export function isCheckmate(
     const isLight = piece.endsWith("l");
     const suffix = isLight ? "l" : "d";
 
+
+
+
     // Store original king positions to restore later
     const originalKingPositions = {
         white: { ...newBoard.kingPositions.white },
         black: { ...newBoard.kingPositions.black }
     };
+
+
 
     // Reset all possible moves first
     for (let r = 0; r < 8; r++) {

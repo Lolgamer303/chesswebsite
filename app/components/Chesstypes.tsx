@@ -17,6 +17,12 @@ export type ChessboardType = {
         };
     };
     kingPositions: {
+    
+    
+    
+    
+    
+    
         white: { row: number; col: number };
         black: { row: number; col: number };
     };

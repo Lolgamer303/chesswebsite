@@ -21,3 +21,4 @@ const testKnightCheck = () => {
 
 // Run the test
 testKnightCheck();
+

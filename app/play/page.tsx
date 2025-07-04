@@ -60,6 +60,10 @@ function defaultChessboard(): ChessboardType {
             }
         },
         kingPositions: {
+        
+        
+        
+        
             white: { row: 7, col: 4 }, // White king starts on
             black: { row: 0, col: 4 } // Black king starts on e8
         }
