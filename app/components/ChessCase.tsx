@@ -11,6 +11,8 @@ interface ChessCaseProps {
     onDragEnd?: () => void;
     selectCase: (pos: { row: number; col: number } | null) => void;
     onToggleHighlight?: (row: number, col: number) => void; // Add this
+    switchTurn?: () => void; // Add this if you need to switch turns
+    resetpossibleMoves?: () => void; // Add this if you need to reset possible moves
     resetHighlight?: () => void; // Add this if you need to reset highlights
 }
 
@@ -24,6 +26,8 @@ export function ChessCase({
     selectedCase,
     selectCase,
     onToggleHighlight, // Add this
+    switchTurn, // Add this if you need to switch turns
+    resetpossibleMoves, // Add this if you need to reset possible moves
     resetHighlight, // Add this if you need to reset highlights
 }: ChessCaseProps) {
     const isSelected =
@@ -56,6 +60,7 @@ export function ChessCase({
         if (onDrop && rowIndex !== undefined && colIndex !== undefined) {
             onDrop(rowIndex, colIndex);
             // Don't call selectCase(null) here - let the parent handle it
+            switchTurn?.(); // Call switchTurn after move
         }
     };
 
@@ -88,7 +93,16 @@ export function ChessCase({
                 }
             }}
             onClick={() => {
+                console.log("ChessCase clicked:", { 
+                    rowIndex, 
+                    colIndex, 
+                    isPossibleMove: chessCase.isPossibleMove, 
+                    selectedCase, 
+                    hasPiece: !!chessCase.piece 
+                });
+                
                 if (chessCase.isPossibleMove && selectedCase) {
+                    console.log("Making move via click");
                     // Move the selected piece to this position
                     if (
                         onDrop &&
@@ -96,16 +110,21 @@ export function ChessCase({
                         colIndex !== undefined
                     ) {
                         onDrop(rowIndex, colIndex);
-                        // Don't call selectCase(null) here - let the parent handle it
+                        switchTurn?.(); // Call switchTurn after move
+                        resetpossibleMoves?.(); // Reset possible moves after move
                     }
                 } else {
                     if (isSelected) {
                         selectCase(null);
+                        resetHighlight?.(); // Reset highlights when deselecting
                     } else {
+                        // Only reset highlights if we're not selecting a piece
+                        if (!chessCase.piece) {
+                            resetHighlight?.();
+                        }
                         selectCase({ row: rowIndex ?? 0, col: colIndex ?? 0 });
                     }
                 }
-                resetHighlight?.(); // Reset highlights if needed
             }}
         >
             <div className='relative w-full h-full'>
@@ -124,7 +143,7 @@ export function ChessCase({
                     </div>
                 )}
                 {chessCase.isHighlighted && (
-                    <div className={`absolute inset-0 flex items-center justify-center pointer-events-none ${chessCase.color === "white" ? "bg-[#EB7D6A]" : "bg-[#D36C50]"}`}>
+                    <div className={`absolute inset-0 flex items-center justify-center -z-50 pointer-events-none ${chessCase.color === "white" ? "bg-[#EB7D6A]" : "bg-[#D36C50]"}`}>
                     </div>
                 )}
                 {chessCase.isPossibleMove && !chessCase.piece && (
